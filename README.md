@@ -15,6 +15,20 @@ Replace this paragraph with your own summary of what your version does.
 
 ---
 
+
+ For a simple recommender, use the 5 numerical features: energy, valence, danceability, tempo_bpm, acousticness, plus one-hot encoded genre and mood. This gives you a dense feature vector you can compute cosine similarity on directly.
+
+mood and energy tend to dominate user perception, so if you want to simplify further, those two alone will give reasonable results.
+
+
+A scoring rule is a function that takes one song + one user profile and returns the calculated score of the song. A ranking rule takes the list of all scored songs and decides the order to present them.
+
+The simplest ranking rule is sort by score descending, return top-k.But ranking can be more nuanced than just sorting:
+
+Diversity: don't return 10 songs by the same artist even if they all score high
+Novelty: prefer songs the user hasn't heard recently
+Freshness: boost new releases even if their raw score is slightly lower.
+
 ## How The System Works
 
 Explain your design in plain language.
@@ -29,6 +43,59 @@ Some prompts to answer:
 
 You can include a simple diagram or bullet list if helpful.
 
+In real world senarios, big tech companies like spotify and Youtube would use strategies including collaborative filtering and content-based filtering for recommendation systems. Collaborative filtering uses the idea: "Users who liked what you liked also enjoyed X." The platform finds users with similar taste profiles and recommends what those users loved. For content-based filtering, rather than looking at other users, it analyzes the content itself including musical features like tempo, key, energy, danceability. In this system, we will use content-based filtering, that is to compare the features of the song list and the features of the songs the users like, calcuate the score of the songs based on proximity and recommend the top k scored songs from the list. 
+
+Each Song object in the system will include the following features:
+    id: int
+    title: str
+    artist: str
+    genre: str
+    mood: str
+    energy: float
+    tempo_bpm: float
+    valence: float
+    danceability: float
+    acousticness: float
+
+Each UserProfile object will store the following features:
+    favorite_genre: str
+    favorite_mood: str
+    target_energy: float
+    target_acousticness: float
+    target_tempo: float
+    target_valence: float
+    target_danceability: float
+
+We updated the UserProfile object and mirrored all available features in Song object to increase the recommendation ability and accuracy. We changed the boolean likes_acoustic to a float variable target_acoustincness to better capture user's likeliness on acousticness. 
+
+For numerical features, we will use the proximity score formula and use inverted absolute difference: score = 1 - |song.energy - user.target_energy| 
+to calculate the score so that the closest ones will have the highest score.
+
+Boolean features use a simpler rule — match = bonus, no match = no bonus:
+acoustic_score = 1.0 if (user.likes_acoustic and song.acousticness > 0.6) else 0.0
+
+For handling categorical data: Exact match = 1.0, no match = 0.0:
+genre_score = 1.0 if song.genre == user.favorite_genre else 0.0
+mood_score  = 1.0 if song.mood  == user.favorite_mood  else 0.0
+
+In addition, we will add weights to different features, a matching genre will be assigned more score than matching mood.
+
+The recommender will compute the score for each song based on the following scoring criterion: 
+
+| Criterion | Max Points | Methods |
+| Genre match |	+2.0 | Exact string match |
+| Mood match | +1.5 | Exact string match |
+| Energy proximity | +1.0 | `1 - |
+| Acousticness proximity | +1.0 | `1 - |
+| Valence proximity | +1.0 | `1 - |
+| Danceability proximity | +1.0 | `1 - |
+| Tempo proximity | +1.0 | `1 - |
+
+Because genre is a more reliable, persistent signal of who the user is, while mood is more situational, a reasonable case is: genre_match → +2.0 and mood_match → +1.5. In this case, This system might over-prioritize genre over mood. 
+The four continuous attributes (energy, acousticness, valence, danceability) are all assumed to be in a [0, 1] range, so their proximity scores are also naturally bounded to [0, 1].
+Tempo is on a much larger scale (BPM), so it's normalized by dividing the absolute difference by 200 before subtracting from 1.
+
+We will choose the top k scored songs to recommend. 
 ---
 
 ## Getting Started

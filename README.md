@@ -10,6 +10,9 @@ Resonance 1.0 is a content-based music recommender that matches songs from the c
 
 In real world senarios, big tech companies like spotify and Youtube would use strategies including collaborative filtering and content-based filtering for recommendation systems. Collaborative filtering uses the idea: "Users who liked what you liked also enjoyed X." The platform finds users with similar taste profiles and recommends what those users loved. For content-based filtering, rather than looking at other users, it analyzes the content itself including musical features like tempo, key, energy, danceability. In this system, we will use content-based filtering, that is to compare the features of the song list and the features of the songs the users like, calcuate the score of the songs based on proximity and recommend the top k scored songs from the list. 
 
+The process flowchart of the system is shown below.
+![flowchart](images/flowchart.png)
+
 Each Song object in the system will include the following features:
 - id: int
 - title: str

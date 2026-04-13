@@ -1,6 +1,6 @@
 import csv
 from typing import List, Dict, Tuple, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, replace as _dc_replace
 
 @dataclass
 class Song:
@@ -36,6 +36,13 @@ class UserProfile:
 
 # Maximum BPM used to normalize tempo difference into a 0-1 range.
 _MAX_TEMPO_BPM = 200.0
+
+# Unit-range features that must stay within [0.0, 1.0].
+_UNIT_FEATURES = ("energy", "acousticness", "valence", "danceability")
+
+
+def _clamp(value: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, value))
 
 
 def _score_song(user: UserProfile, song: Song) -> float:
@@ -76,6 +83,32 @@ class Recommender:
         self.songs = songs
 
     def recommend(self, user: UserProfile, k: int = 5) -> List[Song]:
+        # Clamp out-of-bounds numeric fields and warn.
+        profile_ranges = {
+            "target_energy":       (0.0, 1.0),
+            "target_acousticness": (0.0, 1.0),
+            "target_valence":      (0.0, 1.0),
+            "target_danceability": (0.0, 1.0),
+            "target_tempo":        (0.0, _MAX_TEMPO_BPM),
+        }
+        changes = {}
+        for field, (lo, hi) in profile_ranges.items():
+            val = getattr(user, field)
+            if not (lo <= val <= hi):
+                clamped = _clamp(val, lo, hi)
+                print(f"Warning: '{field}' value {val} out of [{lo}, {hi:.0f}]; clamping to {clamped:.2f}.")
+                changes[field] = clamped
+        if changes:
+            user = _dc_replace(user, **changes)
+
+        # Warn if genre or mood won't match any song in the catalog.
+        catalog_genres = {s.genre for s in self.songs}
+        catalog_moods  = {s.mood  for s in self.songs}
+        if user.favorite_genre not in catalog_genres:
+            print(f"Warning: genre '{user.favorite_genre}' not found in catalog; genre bonus will never apply.")
+        if user.favorite_mood not in catalog_moods:
+            print(f"Warning: mood '{user.favorite_mood}' not found in catalog; mood bonus will never apply.")
+
         scored = sorted(self.songs, key=lambda s: _score_song(user, s), reverse=True)
         return scored[:k]
 
@@ -131,39 +164,59 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tup
     Returns a list of (song_dict, score, reasons) tuples sorted by score descending,
     where reasons is a list of individual explanation strings.
     """
+    # Clamp out-of-bounds numeric prefs and warn.
+    prefs = dict(user_prefs)
+    for feat in _UNIT_FEATURES:
+        if feat in prefs and not (0.0 <= prefs[feat] <= 1.0):
+            clamped = _clamp(prefs[feat], 0.0, 1.0)
+            print(f"Warning: '{feat}' value {prefs[feat]} out of [0, 1]; clamping to {clamped:.2f}.")
+            prefs[feat] = clamped
+    if "tempo_bpm" in prefs and not (0.0 <= prefs["tempo_bpm"] <= _MAX_TEMPO_BPM):
+        clamped = _clamp(prefs["tempo_bpm"], 0.0, _MAX_TEMPO_BPM)
+        print(f"Warning: 'tempo_bpm' value {prefs['tempo_bpm']} out of [0, {_MAX_TEMPO_BPM:.0f}]; clamping to {clamped:.0f}.")
+        prefs["tempo_bpm"] = clamped
+
+    # Warn if genre or mood won't match any song in the catalog.
+    catalog_genres = {s.get("genre") for s in songs}
+    catalog_moods  = {s.get("mood")  for s in songs}
+    if prefs.get("genre") and prefs["genre"] not in catalog_genres:
+        print(f"Warning: genre '{prefs['genre']}' not found in catalog; genre bonus will never apply.")
+    if prefs.get("mood") and prefs["mood"] not in catalog_moods:
+        print(f"Warning: mood '{prefs['mood']}' not found in catalog; mood bonus will never apply.")
+
     def score(song: Dict) -> float:
         s = 0.0
-        if song.get("genre") == user_prefs.get("genre"):
+        if song.get("genre") == prefs.get("genre"):
             s += 2.0
-        if song.get("mood") == user_prefs.get("mood"):
-            s += 2.0
-        if "energy" in user_prefs:
-            s += 1.0 - abs(song["energy"] - user_prefs["energy"])
-        if "acousticness" in user_prefs:
-            s += 1.0 - abs(song["acousticness"] - user_prefs["acousticness"])
-        if "valence" in user_prefs:
-            s += 1.0 - abs(song["valence"] - user_prefs["valence"])
-        if "danceability" in user_prefs:
-            s += 1.0 - abs(song["danceability"] - user_prefs["danceability"])
-        if "tempo_bpm" in user_prefs:
-            s += 1.0 - abs(song["tempo_bpm"] - user_prefs["tempo_bpm"]) / _MAX_TEMPO_BPM
+        if song.get("mood") == prefs.get("mood"):
+            s += 1.5
+        if "energy" in prefs:
+            s += 1.0 - abs(song["energy"] - prefs["energy"])
+        if "acousticness" in prefs:
+            s += 1.0 - abs(song["acousticness"] - prefs["acousticness"])
+        if "valence" in prefs:
+            s += 1.0 - abs(song["valence"] - prefs["valence"])
+        if "danceability" in prefs:
+            s += 1.0 - abs(song["danceability"] - prefs["danceability"])
+        if "tempo_bpm" in prefs:
+            s += 1.0 - abs(song["tempo_bpm"] - prefs["tempo_bpm"]) / _MAX_TEMPO_BPM
         return s
 
     def explain(song: Dict) -> List[str]:
         reasons = []
-        if song.get("genre") == user_prefs.get("genre"):
+        if song.get("genre") == prefs.get("genre"):
             reasons.append(f"matches your favorite genre ({song['genre']})")
-        if song.get("mood") == user_prefs.get("mood"):
+        if song.get("mood") == prefs.get("mood"):
             reasons.append(f"matches your preferred mood ({song['mood']})")
-        if "energy" in user_prefs and abs(song["energy"] - user_prefs["energy"]) <= 0.15:
+        if "energy" in prefs and abs(song["energy"] - prefs["energy"]) <= 0.15:
             reasons.append(f"energy is close to your target ({song['energy']:.2f})")
-        if "acousticness" in user_prefs and abs(song["acousticness"] - user_prefs["acousticness"]) <= 0.15:
+        if "acousticness" in prefs and abs(song["acousticness"] - prefs["acousticness"]) <= 0.15:
             reasons.append(f"acousticness fits your preference ({song['acousticness']:.2f})")
-        if "valence" in user_prefs and abs(song["valence"] - user_prefs["valence"]) <= 0.15:
+        if "valence" in prefs and abs(song["valence"] - prefs["valence"]) <= 0.15:
             reasons.append(f"valence is near your target ({song['valence']:.2f})")
-        if "danceability" in user_prefs and abs(song["danceability"] - user_prefs["danceability"]) <= 0.15:
+        if "danceability" in prefs and abs(song["danceability"] - prefs["danceability"]) <= 0.15:
             reasons.append(f"danceability matches your preference ({song['danceability']:.2f})")
-        if "tempo_bpm" in user_prefs and abs(song["tempo_bpm"] - user_prefs["tempo_bpm"]) <= 15:
+        if "tempo_bpm" in prefs and abs(song["tempo_bpm"] - prefs["tempo_bpm"]) <= 15:
             reasons.append(f"tempo is close to your target ({song['tempo_bpm']:.0f} BPM)")
         if not reasons:
             reasons.append("overall profile is a reasonable match")

@@ -145,14 +145,23 @@ What to watch in the "Parsed preferences" debug expander:
 
 ![walkthrough](assets/walkthrough.gif)
 
-- Example of CLI output:
+- Example of CLI output (no_llm):
 
-![sample_CLI_output](assets/CLI_no_llm.png)
+![sample_CLI_output_no_llm](assets/CLI_no_llm.png)
+
+- Example of CLI output (with_llm):
+
+![sample_CLI_output_with_llm](assets/CLI_llm.png)
+![sample_CLI_output_with_llm](assets/CLI_llm_2.png)
 
 - Example of parsed preferences details:
 
 ![parsed_preferences](assets/parsed_prefs.png)
 ![parsed_preferences](assets/parsed_prefs_2.png)
+
+- Example of score detail card:
+
+![detail_card](assets/detail_card.png)
 
 ---
 

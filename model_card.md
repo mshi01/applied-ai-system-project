@@ -10,8 +10,6 @@ A music recommender that pairs a deterministic rule-based scorer with a Gemini-p
 
 Resonance 2.0 takes a free-text query — a mood, an activity, a lyrical theme, or a stylistic reference — and returns a ranked list of songs with one-sentence explanations grounded in each track's lyrics excerpt. It operates on a fixed 1,002-song catalog, is designed for exploration of RAG systems and small-scale music discovery.
 
-Unlike a vector-similarity recommender (e.g. embeddings + ANN), Resonance 2.0's ranker is a transparent additive scorer that can be reasoned about line by line. The Gemini layer's job is translation (NL → structured prefs) and presentation (per-song blurbs), not ranking.
-
 ## 3. How the Model Works
 
 The pipeline has five stages:
@@ -55,7 +53,7 @@ When Gemini extracts `themes=["heartbreak", "moving on"]` from a query, the scor
 - **Recommender / scorer:** `src/recommender.py`. Includes both a functional `recommend_songs(prefs, songs, k)` (used by the CLI and Streamlit UI) and an OOP `Recommender` class (kept for the starter test contract).
 - **Query parser:** `src/rag.py:parse_query`. Single Gemini 2.5 Flash call with `response_mime_type="application/json"` and `thinking_budget=0` (parsing is a near-template task — thinking tokens would otherwise eat the output budget on Flash). Null-valued features are stripped before returning so the scorer treats them as unspecified.
 - **Explanation writer:** `src/rag.py:generate_explanation`. Single Gemini 2.5 Flash call with `max_output_tokens=2000` to leave room for one sentence per recommendation. Each song's lyrics excerpt is included in the prompt as grounding.
-- **UI:** Streamlit (`app.py`). Sidebar settings, four example-query chips, search form, results rendered as bordered cards with track and artist name, genre / mood badges, and a collapsed "Why this song?" reasons, score progress bars and lyrics excerpt. 
+- **UI:** CLI or Streamlit (`app.py`). Sidebar settings, four example-query chips, search form, results rendered as bordered cards with track and artist name, genre / mood badges, and a collapsed "Why this song?" reasons, score progress bars and lyrics excerpt. 
 - **Test suite:** `pytest` over `tests/test_recommender.py` (functional + OOP scorer behavior including the new themes feature) and `tests/test_rag.py` (`parse_query` JSON post-processing with the Gemini client monkey-patched).
 
 ## 6. Strengths
@@ -76,7 +74,6 @@ When Gemini extracts `themes=["heartbreak", "moving on"]` from a query, the scor
 - **LLM explanation unreliability.** `generate_explanation` is grounded in lyrics, but Gemini can still produce plausible-sounding rationales that emphasize attributes not actually salient. The retrieval / ranking is auditable; the explanations should be read as suggestions, not verified facts.
 - **No personalization.** Two users issuing the same query get the same results. No history, no feedback, no contrastive signal.
 - **No diversity reranking.** Top-K can contain multiple tracks by the same artist or near-identical feature profiles.
-- **Cost.** Two Gemini API calls per query in the default Streamlit / CLI flow. The free tier (~10 RPM, ~250 RPD on Gemini 2.5 Flash at time of writing) handles classroom and demo use; sustained heavier use would hit limits.
 
 ## 8. Evaluation
 

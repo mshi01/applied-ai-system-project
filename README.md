@@ -1,4 +1,4 @@
-# 🎵 RAG Music Recommender
+# 🎵 RAG Song Recommender
 
 ## Project Summary
 

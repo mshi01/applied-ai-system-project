@@ -142,11 +142,13 @@ What to watch in the "Parsed preferences" debug expander:
 
 ---
 
-## Example output:
-- App walkthrough:
+## App walkthrough:
 
 ![walkthrough](assets/walkthrough.gif)
 
+---
+
+## Output details:
 - Example of CLI output (no_llm):
 
 ![sample_CLI_output_no_llm](assets/CLI_no_llm.png)
@@ -155,6 +157,11 @@ What to watch in the "Parsed preferences" debug expander:
 
 ![sample_CLI_output_with_llm](assets/CLI_llm.png)
 ![sample_CLI_output_with_llm](assets/CLI_llm_2.png)
+
+- Example of Streamlit UI output:
+
+![sample_streamlit_output](assets/streamlit_ui.png)
+![sample_streamlit_output](assets/streamlit_ui_2.png)
 
 - Example of parsed preferences details:
 

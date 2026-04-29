@@ -160,7 +160,8 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tup
     Functional implementation of the recommendation logic.
     Required by src/main.py
 
-    user_prefs keys used: "genre", "mood", "energy"
+    user_prefs keys used: "genre", "mood", "energy", "acousticness", "valence",
+        "danceability", "tempo_bpm", "themes" (list of lowercase lyric keywords).
     Returns a list of (song_dict, score, reasons) tuples sorted by score descending,
     where reasons is a list of individual explanation strings.
     """
@@ -184,6 +185,17 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tup
     if prefs.get("mood") and prefs["mood"] not in catalog_moods:
         print(f"Warning: mood '{prefs['mood']}' not found in catalog; mood bonus will never apply.")
 
+    raw_themes = prefs.get("themes") or []
+    themes_lc = [t.lower().strip() for t in raw_themes if isinstance(t, str) and t.strip()]
+
+    def matched_themes(song: Dict) -> List[str]:
+        if not themes_lc:
+            return []
+        lyrics = (song.get("lyrics") or "").lower()
+        if not lyrics:
+            return []
+        return [t for t in themes_lc if t in lyrics]
+
     def score(song: Dict) -> float:
         s = 0.0
         if song.get("genre") == prefs.get("genre"):
@@ -200,6 +212,8 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tup
             s += 1.0 - abs(song["danceability"] - prefs["danceability"])
         if "tempo_bpm" in prefs:
             s += 1.0 - abs(song["tempo_bpm"] - prefs["tempo_bpm"]) / _MAX_TEMPO_BPM
+        if themes_lc:
+            s += 2.0 * (len(matched_themes(song)) / len(themes_lc))
         return s
 
     def explain(song: Dict) -> List[str]:
@@ -218,6 +232,10 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tup
             reasons.append(f"danceability matches your preference ({song['danceability']:.2f})")
         if "tempo_bpm" in prefs and abs(song["tempo_bpm"] - prefs["tempo_bpm"]) <= 15:
             reasons.append(f"tempo is close to your target ({song['tempo_bpm']:.0f} BPM)")
+        matched = matched_themes(song)
+        if matched:
+            quoted = ", ".join(f"'{t}'" for t in matched)
+            reasons.append(f"lyrics mention {quoted}")
         if not reasons:
             reasons.append("overall profile is a reasonable match")
         return reasons

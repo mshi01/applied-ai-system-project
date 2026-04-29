@@ -13,3 +13,14 @@ venv/
 
 # Pytest cache
 .pytest_cache/
+
+# RAG pipeline artifacts
+data/chroma_music_db/
+data/spotify_tracks.csv
+
+# Secrets
+.env
+
+# Datasets
+.csv
+

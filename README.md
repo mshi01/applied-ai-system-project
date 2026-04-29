@@ -6,14 +6,16 @@ Resonance 2.0 is a song recommender that takes a free-text request — "chill so
 
 The system pairs a small, transparent rule-based scorer with a Gemini RAG layer. Gemini 2.5 Flash converts the user's natural-language query into a structured preference profile (genre, mood, target audio features, lyric themes), the scorer ranks the 1,002-song catalog against that profile, and Gemini writes per-song blurbs that quote from each track's lyrics excerpt to explain why it fits.
 
-This is the second iteration of the project. Resonance 1.0 required the user to fill out a numeric profile (favorite genre, target energy, target tempo, ...) and matched against 20 hand-curated songs without lyrics. Resonance 2.0 keeps the same readable scoring formula but adds three things: natural-language input, a 50× larger catalog of real Spotify tracks with lyrics, and a lyric-theme matching component so a query like "songs about heartbreak" actually surfaces heartbreak songs — not just sad-sounding ones.
+This is the second iteration based on project 3. Resonance 1.0 required the user to fill out a numeric profile (favorite genre, target energy, target tempo, ...) and matched against 20 hand-curated songs without lyrics. Resonance 2.0 keeps the same readable scoring formula but adds three things: natural-language input, a 50× larger catalog of real Spotify tracks with lyrics, and a lyric-theme matching component so a query like "songs about heartbreak" actually surfaces heartbreak songs — not just sad-sounding ones.
 
 ## How The System Works
 
 The system diagram is shown below:
 ![system diagram](assets/system_diagram.png)
 
-The system runs in two phases. Offline, scripts/ingest_kaggle.py takes the raw ~18K-song Kaggle dataset, filters to English tracks with non-null lyrics, dedupes on (track_name, track_artist), keeps the top-167 by popularity per genre for a balanced 1,002-song catalog, derives a coarse mood label from valence, and truncates each lyric to 500 characters — producing data/spotify_sample.csv. Online, when a user submits a free-text query, src/rag.py:parse_query sends it to Gemini 2.5 Flash and gets back a structured JSON profile (genre, mood, audio-feature targets, and lyric themes — with unspecified features left as null). Those prefs flow into src/recommender.py:recommend_songs, a deterministic rule-based scorer that ranks every catalog song by combining genre/mood matches, audio-feature proximity, and lyric-theme substring overlap. The top-K and their per-song reasons are returned to the caller; if the user opted in, src/rag.py:generate_explanation makes a second Gemini call to write one-sentence blurbs grounded in each song's lyrics excerpt. The Streamlit UI (or CLI) renders the final ranked list. The scorer is the ranker — Gemini handles only translation and presentation, never reordering — which keeps the recommendations auditable to a single line of code.
+The system runs in two phases. 
+- Offline, scripts/ingest_kaggle.py takes the raw ~18K-song Kaggle dataset, filters to English tracks with non-null lyrics, dedupes on (track_name, track_artist), keeps the top-167 by popularity per genre for a balanced 1,002-song catalog, derives a coarse mood label from valence, and truncates each lyric to 500 characters — producing data/spotify_sample.csv. 
+- Online, when a user submits a free-text query, src/rag.py:parse_query sends it to Gemini 2.5 Flash and gets back a structured JSON profile (genre, mood, audio-feature targets, and lyric themes — with unspecified features left as null). Those prefs flow into src/recommender.py:recommend_songs, a deterministic rule-based scorer that ranks every catalog song by combining genre/mood matches, audio-feature proximity, and lyric-theme substring overlap. The top-K and their per-song reasons are returned to the caller; if the user opted in, src/rag.py:generate_explanation makes a second Gemini call to write one-sentence blurbs grounded in each song's lyrics excerpt. The Streamlit UI (or CLI) renders the final ranked list. 
 
 ### Scoring formula
 
@@ -87,7 +89,7 @@ The lyric-theme component lower-cases each Gemini-extracted theme (e.g. `["heart
 
 4. Download the source dataset and build the catalog:
 
-   - Get the Kaggle dataset titled **"Audio features and lyrics of Spotify songs"** (~18,000 English-language tracks with audio features + lyrics) and place the CSV at `data/spotify_18k_songs.csv`.
+   - Get the Kaggle dataset titled [**"Audio features and lyrics of Spotify songs"**](https://www.kaggle.com/datasets/imuhammad/audio-features-and-lyrics-of-spotify-songs?select=spotify_songs.csv) (~18,000 English-language tracks with audio features + lyrics) and place the CSV at `data/spotify_18k_songs.csv`.
    - Run the ingest script to produce `data/spotify_sample.csv`:
 
      ```bash
@@ -159,7 +161,7 @@ What to watch in the "Parsed preferences" debug expander:
 ![parsed_preferences](assets/parsed_prefs.png)
 ![parsed_preferences](assets/parsed_prefs_2.png)
 
-- Example of score detail card:
+- Example of match details card:
 
 ![detail_card](assets/detail_card.png)
 
